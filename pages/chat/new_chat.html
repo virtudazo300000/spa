@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Form</title>
+    
+    <!-- Include Semantic UI for base styling -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.css">
+    
+    <!-- Include Alpine.js -->
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    
+    <style>
+        /* Modern styling for the chat component */
+        .ui.segment[x-data="newChatComponent"] {
+            max-width: 600px;
+            margin: 2rem auto;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            border: none;
+            padding: 2rem;
+            background: #ffffff;
+            transition: all 0.3s ease;
+        }
+
+        /* Message styling */
+        .ui.message {
+            border-radius: 8px !important;
+            padding: 12px 16px !important;
+            margin-bottom: 1.5rem !important;
+            font-weight: 500;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05) !important;
+        }
+
+        .ui.red.message {
+            background-color: #fff5f5 !important;
+            color: #e53e3e !important;
+            border-left: 4px solid #e53e3e !important;
+        }
+
+        .ui.green.message {
+            background-color: #f0fff4 !important;
+            color: #38a169 !important;
+            border-left: 4px solid #38a169 !important;
+        }
+
+        .ui.yellow.message {
+            background-color: #fffaf0 !important;
+            color: #d69e2e !important;
+            border-left: 4px solid #d69e2e !important;
+        }
+
+        /* Header styling */
+        .ui.header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 1.5rem !important;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid #f7fafc;
+        }
+
+        .ui.header i.icon {
+            font-size: 1.8rem;
+            margin-right: 0.75rem;
+            color: #4299e1;
+        }
+
+        .ui.header .content {
+            flex: 1;
+        }
+
+        .ui.header .content .sub.header {
+            margin-top: 0.25rem;
+            color: #718096;
+            font-weight: 400;
+            font-size: 0.9rem;
+        }
+
+        /* Form styling */
+        .ui.form .field {
+            margin-bottom: 1.5rem !important;
+        }
+
+        .ui.form .field > label {
+            font-weight: 600 !important;
+            margin-bottom: 0.5rem !important;
+            color: #2d3748;
+            font-size: 0.95rem;
+        }
+
+        .ui.left.icon.input {
+            width: 100%;
+            position: relative;
+        }
+
+        .ui.input > input, 
+        .ui.form textarea {
+            border-radius: 8px !important;
+            border: 2px solid #e2e8f0 !important;
+            padding: 0.75rem 1rem !important;
+            transition: all 0.2s ease;
+            font-size: 1rem !important;
+            background-color: #f8fafc !important;
+        }
+
+        .ui.input > input:focus, 
+        .ui.form textarea:focus {
+            border-color: #4299e1 !important;
+            background-color: #fff !important;
+            box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.15) !important;
+        }
+
+        /* Fix for the user icon */
+        .ui.left.icon.input > i.icon {
+            position: absolute !important;
+            top: 50% !important;
+            transform: translateY(-50%) !important;
+            left: 1rem !important;
+            opacity: 0.6 !important;
+            font-size: 1.2rem !important;
+            color: #718096 !important;
+            margin: 0 !important;
+            pointer-events: none !important;
+            z-index: 3 !important;
+        }
+
+        .ui.left.icon.input > input {
+            padding-left: 3rem !important;
+        }
+
+        /* Button styling */
+        .ui.primary.button {
+            background-color: #4299e1 !important;
+            color: white !important;
+            border-radius: 8px !important;
+            padding: 0.75rem 1.5rem !important;
+            font-weight: 600 !important;
+            font-size: 1rem !important;
+            transition: all 0.2s ease !important;
+            box-shadow: 0 4px 6px rgba(66, 153, 225, 0.2) !important;
+            margin-top: 0.5rem !important;
+        }
+
+        .ui.primary.button:hover {
+            background-color: #3182ce !important;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 8px rgba(66, 153, 225, 0.25) !important;
+        }
+
+        .ui.primary.button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(66, 153, 225, 0.2) !important;
+        }
+
+        .ui.primary.button i.icon {
+            margin-right: 0.5rem !important;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 640px) {
+            .ui.segment[x-data="newChatComponent"] {
+                margin: 1rem;
+                padding: 1.5rem;
+            }
+            
+            .ui.form .field.inline {
+                display: block !important;
+            }
+        }
+
+        /* Dark mode support (optional) */
+        @media (prefers-color-scheme: dark) {
+            body {
+                background-color: #1a202c;
+            }
+            
+            .ui.segment[x-data="newChatComponent"] {
+                background: #1a202c;
+                color: #e2e8f0;
+            }
+            
+            .ui.header {
+                border-bottom-color: #2d3748;
+            }
+            
+            .ui.header .content .sub.header {
+                color: #a0aec0;
+            }
+            
+            .ui.form .field > label {
+                color: #e2e8f0;
+            }
+            
+            .ui.input > input, 
+            .ui.form textarea {
+                background-color: #2d3748 !important;
+                border-color: #4a5568 !important;
+                color: #e2e8f0 !important;
+            }
+            
+            .ui.input > input:focus, 
+            .ui.form textarea:focus {
+                background-color: #2d3748 !important;
+                border-color: #4299e1 !important;
+            }
+            
+            .ui.left.icon.input > i.icon {
+                color: #a0aec0 !important;
+            }
+            
+            .ui.red.message {
+                background-color: rgba(229, 62, 62, 0.1) !important;
+                color: #fc8181 !important;
+            }
+            
+            .ui.green.message {
+                background-color: rgba(56, 161, 105, 0.1) !important;
+                color: #68d391 !important;
+            }
+            
+            .ui.yellow.message {
+                background-color: rgba(214, 158, 46, 0.1) !important;
+                color: #f6e05e !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="ui segment" x-data="newChatComponent">
+        <!-- Display Loading Message -->
+        <div class="ui message" x-show="message" :class="messageType">
+            <p x-text="message"></p>
+        </div>
+
+        <h2 class="ui header">
+            <i class="comment alternate icon"></i>
+            <div class="content">
+                New Chat
+                <div class="sub header">Create a new chat message</div>
+            </div>
+        </h2>
+
+        <form class="ui form">
+            <div class="field inline">
+                <label>Username</label>
+                <div class="ui left icon input">
+                    <input type="text" x-model="newChat.username" required placeholder="Enter your username">
+                    <i class="user icon"></i>
+                </div>
+            </div>
+
+            <div class="field inline">
+                <label>Message</label>
+                <textarea x-model="newChat.chat_message" required placeholder="Type your message here..." rows="3"></textarea>
+            </div>
+
+            <button class="ui primary button" @click.prevent="sendChat">
+                <i class="paper plane icon"></i> Send Message
+            </button>
+        </form>
+    </div>
+
+    <script>
+        // Initialize a global variable store if it doesn't exist
+        if (!Alpine.store("GlobalVariable")) {
+            Alpine.store("GlobalVariable", {
+                chats: { data: [], total: 0 }
+            });
+        }
+
+        // Initialize settings store if it doesn't exist
+        if (!Alpine.store("settings")) {
+            Alpine.store("settings", {
+                apiBaseUrl: "/api" // Default API base URL
+            });
+        }
+
+        Alpine.data("newChatComponent", () => ({
+            newChat: Alpine.reactive({
+                username: '',
+                chat_message: ''
+            }),
+            message: '',
+            messageType: '',
+
+            sendChat() {
+                // Check if all required fields are filled
+                const isFormValid = Object.values(this.newChat).every(value => value.toString().trim() !== "");
+                
+                if (!isFormValid) {
+                    this.message = "Please fill in all required fields.";
+                    this.messageType = "red"; // Red for error
+                    setTimeout(() => { this.message = ""; }, 3000); // Clear message after 3 seconds
+                    return; // Exit early
+                }
+
+                this.message = "Sending...";
+                this.messageType = "yellow"; // Yellow for loading
+
+                // Add current date to the chat data
+                const chatData = {
+                    ...this.newChat,
+                    date: new Date().toISOString()
+                };
+
+                // Send the chat data to the backend
+                fetch(`${Alpine.store("settings").apiBaseUrl}/chat/`, {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify(chatData)
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error("Network response was not ok");
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    this.message = "Message sent successfully!";
+                    this.messageType = "green";  // Green for success
+                    
+                    // Update local storage to persist username
+                    localStorage.setItem('lastUsername', this.newChat.username);
+                    
+                    // Update the chat list by dispatching a custom event
+                    const chatAddedEvent = new CustomEvent('chat-added', { 
+                        detail: { chatData: data || chatData },
+                        bubbles: true
+                    });
+                    window.dispatchEvent(chatAddedEvent);
+                    
+                    // Update global store
+                    if (Array.isArray(Alpine.store("GlobalVariable").chats.data)) {
+                        Alpine.store("GlobalVariable").chats.data.unshift(data || chatData);
+                        Alpine.store("GlobalVariable").chats.total = Alpine.store("GlobalVariable").chats.data.length;
+                    }
+                    
+                    // Reset message field but keep username
+                    this.newChat.chat_message = "";
+                    
+                    // Clear success message after 3 seconds
+                    setTimeout(() => { this.message = ""; }, 3000);
+                })
+                .catch(error => {
+                    console.error("Error sending message:", error);
+                    this.message = "Error sending message: " + error.message;
+                    this.messageType = "red";  // Red for error
+                });
+            },
+            
+            init() {
+                // Restore username from local storage if available
+                const savedUsername = localStorage.getItem('lastUsername');
+                if (savedUsername) {
+                    this.newChat.username = savedUsername;
+                }
+            }
+        }));
+    </script>
+</body>
+</html>
+
