@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shopping Cart</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.css">
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body>
+    <div class="ui container" style="padding: 2rem;"
+         x-data="{
+            cartItems: [],
+            selectedItems: [],
+            loading: true,
+            error: null,
+            message: null,
+            totalAmount: 0,
+            selectedTotal: 0,
+            baseUrl: 'http://172.17.100.14:3329/default',
+
+            async fetchCart() {
+                try {
+                    const response = await fetch(`${this.baseUrl}/api/cart-items/`);
+                    if (!response.ok) throw new Error('Failed to fetch cart');
+                    this.cartItems = await response.json();
+                    this.calculateTotal();
+                } catch (error) {
+                    this.error = 'Error: ' + error.message;
+                } finally {
+                    this.loading = false;
+                }
+            },
+
+            async updateQuantity(item, newQuantity) {
+                if (newQuantity < 1 || newQuantity > item.product.stock) return;
+                
+                try {
+                    const response = await fetch(`${this.baseUrl}/api/cart-items/${item.id}/`, {
+                        method: 'PATCH',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            quantity: newQuantity
+                        })
+                    });
+
+                    if (!response.ok) throw new Error('Failed to update quantity');
+                    const updatedItem = await response.json();
+                    
+                    this.cartItems = this.cartItems.map(i => 
+                        i.id === item.id ? updatedItem : i
+                    );
+                    this.calculateTotal();
+                    this.calculateSelectedTotal();
+                    this.message = 'Quantity updated successfully';
+                } catch (error) {
+                    this.error = 'Error: ' + error.message;
+                }
+                setTimeout(() => {
+                    this.error = null;
+                    this.message = null;
+                }, 3000);
+            },
+
+            async removeItem(itemId) {
+                try {
+                    const response = await fetch(`${this.baseUrl}/api/cart-items/${itemId}/`, {
+                        method: 'DELETE'
+                    });
+                    if (!response.ok) throw new Error('Failed to remove item');
+                    this.cartItems = this.cartItems.filter(item => item.id !== itemId);
+                    this.selectedItems = this.selectedItems.filter(id => id !== itemId);
+                    this.calculateTotal();
+                    this.calculateSelectedTotal();
+                    this.message = 'Item removed successfully';
+                    setTimeout(() => this.message = null, 3000);
+                } catch (error) {
+                    this.error = 'Error: ' + error.message;
+                    setTimeout(() => this.error = null, 3000);
+                }
+            },
+
+            toggleItemSelection(itemId) {
+                if (this.selectedItems.includes(itemId)) {
+                    this.selectedItems = this.selectedItems.filter(id => id !== itemId);
+                } else {
+                    this.selectedItems.push(itemId);
+                }
+                this.calculateSelectedTotal();
+            },
+
+            calculateTotal() {
+                this.totalAmount = this.cartItems.reduce((sum, item) => 
+                    sum + (parseFloat(item.total_price) || 0), 0);
+            },
+
+            calculateSelectedTotal() {
+                this.selectedTotal = this.cartItems
+                    .filter(item => this.selectedItems.includes(item.id))
+                    .reduce((sum, item) => sum + (parseFloat(item.total_price) || 0), 0);
+            },
+
+            proceedToCheckout() {
+                if (this.selectedItems.length === 0) {
+                    this.error = 'Please select items to checkout';
+                    setTimeout(() => this.error = null, 3000);
+                    return;
+                }
+                sessionStorage.setItem('checkoutItems', JSON.stringify(this.selectedItems));
+                window.location.href = 'index.html#product/check_out';
+            }
+         }"
+         x-init="fetchCart">
+
+        <!-- Navigation -->
+        <div class="ui top attached menu">
+            <a href="index.html#product/product_display" class="item">Products</a>
+            <div class="active right item">Cart</div>
+        </div>
+
+        <div class="ui attached segment">
+            <h2 class="ui header">Shopping Cart</h2>
+
+            <!-- Messages -->
+            <div class="ui negative message" x-show="error" x-cloak>
+                <i class="close icon" @click="error = null"></i>
+                <div class="content" x-text="error"></div>
+            </div>
+
+            <div class="ui positive message" x-show="message" x-cloak>
+                <i class="close icon" @click="message = null"></i>
+                <div class="content" x-text="message"></div>
+            </div>
+
+            <!-- Loading State -->
+            <div class="ui active dimmer" x-show="loading" x-cloak>
+                <div class="ui loader"></div>
+            </div>
+
+            <!-- Cart Items -->
+            <div class="ui divided items" x-show="!loading">
+                <template x-for="item in cartItems" :key="item.id">
+                    <div class="item" :class="{ 'selected': selectedItems.includes(item.id) }">
+                        <div class="ui checkbox" style="margin-right: 1em;">
+                            <input type="checkbox" 
+                                   :checked="selectedItems.includes(item.id)"
+                                   @change="toggleItemSelection(item.id)">
+                            <label></label>
+                        </div>
+                        <div class="image">
+                            <img :src="item.product.image_url || 'https://via.placeholder.com/150'" 
+                                 :alt="item.product.name"
+                                 style="width: 150px; height: 150px; object-fit: cover;">
+                        </div>
+                        <div class="content">
+                            <div class="header" x-text="item.product.name"></div>
+                            <div class="meta">
+                                <div class="ui small basic icon buttons">
+                                    <button class="ui button" 
+                                            @click="updateQuantity(item, item.quantity - 1)"
+                                            :class="{ 'disabled': item.quantity <= 1 }">
+                                        <i class="minus icon"></i>
+                                    </button>
+                                    <div class="ui button">
+                                        <span x-text="item.quantity"></span>
+                                    </div>
+                                    <button class="ui button"
+                                            @click="updateQuantity(item, item.quantity + 1)"
+                                            :class="{ 'disabled': item.quantity >= item.product.stock }">
+                                        <i class="plus icon"></i>
+                                    </button>
+                                </div>
+                                <span class="stock-info" 
+                                      x-text="'Available: ' + item.product.stock"
+                                      style="margin-left: 1em; color: #666;">
+                                </span>
+                            </div>
+                            <div class="description">
+                                <p x-text="item.product.description"></p>
+                            </div>
+                            <div class="extra">
+                                <span x-text="'Total: $' + item.total_price"></span>
+                                <button class="ui negative right floated button"
+                                        @click="removeItem(item.id)">
+                                    Remove
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Cart Summary -->
+            <div class="ui segment" x-show="!loading && cartItems.length > 0">
+                <div class="ui two statistics">
+                    <div class="statistic">
+                        <div class="value" x-text="'$' + totalAmount.toFixed(2)"></div>
+                        <div class="label">Cart Total</div>
+                    </div>
+                    <div class="statistic">
+                        <div class="value" x-text="'$' + selectedTotal.toFixed(2)"></div>
+                        <div class="label">Selected Items Total</div>
+                    </div>
+                </div>
+                <div class="ui divider"></div>
+                <button class="ui primary fluid button" 
+                        @click="proceedToCheckout"
+                        :class="{ 'disabled': selectedItems.length === 0 }">
+                    Checkout Selected Items (<span x-text="selectedItems.length"></span>)
+                </button>
+            </div>
+
+            <!-- Empty Cart Message -->
+            <div class="ui placeholder segment" x-show="!loading && cartItems.length === 0">
+                <div class="ui icon header">
+                    <i class="cart icon"></i>
+                    Your cart is empty
+                </div>
+                <a href="index.html#product/product_display" class="ui primary button">Continue Shopping</a>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .item.selected {
+            background-color: #f8ffff;
+            border-left: 3px solid #2185d0;
+            padding-left: 1em;
+        }
+        .ui.checkbox {
+            margin-top: 1em;
+        }
+        .ui.items .item .image {
+            width: 150px;
+            height: 150px;
+            margin-right: 1em;
+        }
+        .ui.small.basic.icon.buttons {
+            margin-top: 0.5em;
+        }
+        .stock-info {
+            color: #666;
+            font-size: 0.9em;
+        }
+    </style>
+</body>
+</html>

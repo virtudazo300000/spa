@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Checkout - Online Store</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.js"></script>
+    <script src="//unpkg.com/alpinejs" defer></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.css">
+</head>
+<body>
+    <div class="ui container" style="padding: 2rem;"
+         x-data="checkoutData()"
+         x-init="fetchSelectedItems()">
+
+        <!-- Navigation -->
+        <div class="ui top attached menu">
+            <a href="index.html#product/product_display" class="item">
+                <i class="shop icon"></i> Products
+            </a>
+            <a href="index.html#product/view_cart" class="item">
+                <i class="shopping cart icon"></i> Cart
+            </a>
+            <div class="active right item">
+                <i class="credit card icon"></i> Checkout
+            </div>
+        </div>
+
+        <div class="ui attached segment">
+            <!-- Header -->
+            <h2 class="ui header">
+                <i class="shopping bag icon"></i>
+                <div class="content">
+                    Secure Checkout
+                    <div class="sub header">Please complete your purchase</div>
+                </div>
+            </h2>
+
+            <!-- Messages -->
+            <div class="ui negative message" x-show="error" x-cloak>
+                <i class="close icon" @click="error = null"></i>
+                <div class="header">Error</div>
+                <p x-text="error"></p>
+            </div>
+
+            <div class="ui positive message" x-show="message" x-cloak>
+                <i class="close icon" @click="message = null"></i>
+                <div class="header">Success</div>
+                <p x-text="message"></p>
+            </div>
+
+            <!-- Loading State -->
+            <div class="ui active dimmer" x-show="loading" x-cloak>
+                <div class="ui text loader">Processing your order...</div>
+            </div>
+
+            <div class="ui two column stackable grid">
+                <!-- Left Column - Order Summary -->
+                <div class="column">
+                    <div class="ui raised segment">
+                        <h3 class="ui dividing header">
+                            <i class="list icon"></i> Order Summary
+                        </h3>
+                        
+                        <!-- Cart Items -->
+                        <div class="ui divided items">
+                            <template x-for="item in cartItems" :key="item.id">
+                                <div class="item">
+                                    <div class="image">
+                                        <img :src="item.product.image_url || 'https://via.placeholder.com/100'" 
+                                             :alt="item.product.name">
+                                    </div>
+                                    <div class="content">
+                                        <div class="header" x-text="item.product.name"></div>
+                                        <div class="meta">
+                                            <span class="ui label" x-text="'Quantity: ' + item.quantity"></span>
+                                        </div>
+                                        <div class="description">
+                                            <p x-text="item.product.description"></p>
+                                        </div>
+                                        <div class="extra">
+                                            <div class="ui label" x-text="'Price: $' + item.product.price"></div>
+                                            <div class="ui label" x-text="'Total: $' + (item.product.price * item.quantity).toFixed(2)"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+
+                        <!-- Total Amount -->
+                        <div class="ui divider"></div>
+                        <div class="ui large statistic">
+                            <div class="value">
+                                <i class="dollar sign icon"></i>
+                                <span x-text="totalAmount.toFixed(2)"></span>
+                            </div>
+                            <div class="label">Total Amount</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column - Payment Form -->
+                <div class="column">
+                    <div class="ui raised segment">
+                        <h3 class="ui dividing header">
+                            <i class="payment icon"></i> Payment Information
+                        </h3>
+
+                        <form class="ui form" @submit.prevent="processPayment">
+                            <div class="required field">
+                                <label>Full Name</label>
+                                <div class="ui left icon input">
+                                    <i class="user icon"></i>
+                                    <input type="text" 
+                                           x-model="paymentForm.name"
+                                           placeholder="Enter your full name"
+                                           required>
+                                </div>
+                            </div>
+
+                            <div class="required field">
+                                <label>Email Address</label>
+                                <div class="ui left icon input">
+                                    <i class="envelope icon"></i>
+                                    <input type="email"
+                                           x-model="paymentForm.email"
+                                           placeholder="Enter your email"
+                                           required>
+                                </div>
+                            </div>
+
+                            <div class="required field">
+                                <label>Delivery Address</label>
+                                <div class="ui left icon input">
+                                    <i class="home icon"></i>
+                                    <textarea x-model="paymentForm.address"
+                                              placeholder="Enter your complete address"
+                                              rows="3"
+                                              required></textarea>
+                                </div>
+                            </div>
+
+                            <div class="required field">
+                                <label>Payment Method</label>
+                                <select class="ui dropdown"
+                                        x-model="paymentForm.payment_method"
+                                        required>
+                                    <option value="">Select Payment Method</option>
+                                    <option value="gcash">GCash</option>
+                                    <option value="maya">Maya</option>
+                                    <option value="paypal">PayPal</option>
+                                </select>
+                            </div>
+
+                            <button class="ui primary fluid large button"
+                                    type="submit"
+                                    :disabled="!validateForm() || loading">
+                                <i class="lock icon"></i>
+                                <span x-show="!loading">Complete Purchase</span>
+                                <span x-show="loading">Processing...</span>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alpine.js Component Script -->
+    <script>
+        function checkoutData() {
+            return {
+                cartItems: [],
+                totalAmount: 0,
+                loading: false,
+                error: null,
+                message: null,
+                baseUrl: 'http://172.17.100.14:3329/default',
+                paymentForm: {
+                    name: '',
+                    email: '',
+                    address: '',
+                    payment_method: ''
+                },
+
+                async fetchSelectedItems() {
+                    try {
+                        this.loading = true;
+                        const selectedIds = JSON.parse(sessionStorage.getItem('checkoutItems') || '[]');
+                        
+                        if (!selectedIds.length) {
+                            throw new Error('No items selected for checkout');
+                        }
+
+                        const response = await fetch(`${this.baseUrl}/api/cart-items/`, {
+                            headers: {
+                                'Accept': 'application/json'
+                            }
+                        });
+                        
+                        if (!response.ok) {
+                            throw new Error(`Failed to fetch cart items: ${response.statusText}`);
+                        }
+                        
+                        const allItems = await response.json();
+                        this.cartItems = allItems.filter(item => selectedIds.includes(item.id));
+                        
+                        if (!this.cartItems.length) {
+                            throw new Error('No items found in cart');
+                        }
+
+                        this.calculateTotal();
+                        console.log('Cart items loaded:', this.cartItems);
+                    } catch (error) {
+                        this.error = error.message;
+                        console.error('Error fetching items:', error);
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                calculateTotal() {
+                    this.totalAmount = this.cartItems.reduce((sum, item) => 
+                        sum + (parseFloat(item.product.price) * item.quantity), 0);
+                },
+
+                validateForm() {
+                    return this.paymentForm.name && 
+                           this.paymentForm.email && 
+                           this.paymentForm.address && 
+                           this.paymentForm.payment_method &&
+                           this.cartItems.length > 0;
+                },
+
+                async processPayment() {
+                    try {
+                        this.loading = true;
+                        this.error = null;
+                        this.message = null;
+
+                        const productsData = this.cartItems.map(item => ({
+                            product_id: item.product.id,
+                            quantity: item.quantity,
+                            price: parseFloat(item.product.price)
+                        }));
+
+                        const payload = {
+                            ...this.paymentForm,
+                            total_amount: parseFloat(this.totalAmount).toFixed(2),
+                            cart_items: this.cartItems.map(item => item.id),
+                            products: productsData
+                        };
+
+                        console.log('Sending payment request:', payload);
+
+                        const response = await fetch(`${this.baseUrl}/api/payments/process/`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json'    
+                            },
+                            body: JSON.stringify(payload)
+                        });
+
+                        console.log('Response status:', response.status);
+                        const result = await response.json();
+
+                        if (!response.ok) {
+                            throw new Error(result.detail || 'Payment failed');
+                        }
+
+                        console.log('Payment successful:', result);
+
+                        sessionStorage.setItem('orderDetails', JSON.stringify({
+                            orderId: result.order_id,
+                            amount: this.totalAmount,
+                            items: this.cartItems,
+                            customerName: this.paymentForm.name,
+                            customerEmail: this.paymentForm.email,
+                            customerAddress: this.paymentForm.address,
+                            paymentMethod: this.paymentForm.payment_method,
+                            orderDate: new Date().toISOString()
+                        }));
+
+                        sessionStorage.removeItem('checkoutItems');
+                        this.message = 'Payment successful! Redirecting...';
+                        
+                        setTimeout(() => {
+                            window.location.href = 'index.html#product/order_list';
+                        }, 1500);
+                    } catch (error) {
+                        this.error = error.message;
+                        console.error('Payment Error:', error);
+                    } finally {
+                        this.loading = false;
+                    }
+                }
+            };
+        }
+
+        // Initialize Semantic UI components
+        $(document).ready(function() {
+            $('.ui.dropdown').dropdown();
+        });
+    </script>
+
+    <style>
+        [x-cloak] { display: none !important; }
+        .ui.items .item .image {
+            width: 100px !important;
+            height: 100px !important;
+            margin-right: 1em;
+        }
+        .ui.items .item .image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .ui.form textarea {
+            width: 100%;
+            resize: vertical;
+        }
+        .ui.selection.dropdown {
+            width: 100%;
+        }
+        .ui.button:disabled {
+            opacity: 0.45 !important;
+            cursor: not-allowed !important;
+        }
+    </style>
+</body>
+</html>

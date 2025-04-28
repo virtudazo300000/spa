@@ -1,0 +1,23 @@
+<div class="ui segment">
+    <h1 class="ui header">Welcome to Our E-commerce Store</h1>
+    <p>Browse our products and enjoy shopping!</p>
+    
+    <div class="ui two column grid">
+        <div class="column">
+            <div class="ui segment">
+                <h3>Featured Products</h3>
+                <button class="ui primary button" @click="navigateTo('product/product_display')">
+                    View Products
+                </button>
+            </div>
+        </div>
+        <div class="column">
+            <div class="ui segment">
+                <h3>Shopping Cart</h3>
+                <button class="ui green button" @click="navigateTo('product/view_cart')">
+                    View Cart
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
