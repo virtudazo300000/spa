@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Shopping Cart</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.css">
+    <link rel="preload" href="/spa/assets/fonts/icons.woff2" as="font" type="font/woff2" crossorigin>
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>
 <body>
@@ -17,7 +18,7 @@
             message: null,
             totalAmount: 0,
             selectedTotal: 0,
-            baseUrl: 'http://172.17.100.14:3329/default',
+            baseUrl: 'http://172.17.100.14:3383/default',
 
             async fetchCart() {
                 try {
@@ -110,6 +111,20 @@
                 }
                 sessionStorage.setItem('checkoutItems', JSON.stringify(this.selectedItems));
                 window.location.href = 'index.html#product/check_out';
+            },
+
+            getImageUrl(product) {
+                if (!product?.image_url) {
+                    console.warn('No image URL for:', product?.name);
+                    return '/spa/assets/default-product-image.png';
+                }
+                try {
+                    const url = new URL(product.image_url);
+                    return `${this.baseUrl}/media/products/${url.pathname.split('/').pop()}`;
+                } catch (e) {
+                    console.error('Invalid image URL:', product?.image_url);
+                    return '/spa/assets/default-product-image.png';
+                }
             }
          }"
          x-init="fetchCart">
@@ -150,9 +165,14 @@
                             <label></label>
                         </div>
                         <div class="image">
-                            <img :src="item.product.image_url || 'https://via.placeholder.com/150'" 
+                            <img :src="getImageUrl(item.product)" 
                                  :alt="item.product.name"
-                                 style="width: 150px; height: 150px; object-fit: cover;">
+                                 class="product-image"
+                                 loading="lazy"
+                                 @error="(e) => {
+                                     console.error('Image load error:', item.product.name);
+                                     e.target.src = '/spa/assets/default-product-image.png';
+                                 }">
                         </div>
                         <div class="content">
                             <div class="header" x-text="item.product.name"></div>
@@ -232,17 +252,31 @@
         .ui.checkbox {
             margin-top: 1em;
         }
-        .ui.items .item .image {
-            width: 150px;
-            height: 150px;
-            margin-right: 1em;
-        }
         .ui.small.basic.icon.buttons {
             margin-top: 0.5em;
         }
         .stock-info {
             color: #666;
             font-size: 0.9em;
+        }
+
+        .product-image {
+            width: 150px !important;
+            height: 150px !important;
+            object-fit: cover;
+            background: #f5f5f5;
+            border-radius: 4px;
+        }
+
+        [x-cloak] { 
+            display: none !important; 
+        }
+
+        @font-face {
+            font-family: 'Icons';
+            font-display: swap;
+            src: local('Icons'),
+                 url('/spa/assets/fonts/icons.woff2') format('woff2');
         }
     </style>
 </body>

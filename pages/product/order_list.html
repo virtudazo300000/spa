@@ -5,171 +5,259 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Order History</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.css">
-    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://unpkg.com/alpinejs@3.14.8/dist/cdn.min.js" defer></script>
 </head>
 <body>
-    <div class="ui container" style="padding: 2rem;"
-         x-data="{
-            orders: [],
-            loading: true,
-            error: null,
-            selectedOrder: null,
-            baseUrl: 'http://172.17.100.14:3329/default',
-            formatDate(date) {
-                return new Date(date).toLocaleString();
-            },
-            formatPrice(price) {
-                return new Intl.NumberFormat('en-US', {
-                    style: 'currency',
-                    currency: 'USD'
-                }).format(price);
-            },
-            async fetchOrders() {
-                try {
-                    const response = await fetch(`${this.baseUrl}/api/payments/`);
-                    if (!response.ok) throw new Error('Failed to fetch orders');
-                    this.orders = await response.json();
-                } catch (error) {
-                    this.error = 'Error: ' + error.message;
-                } finally {
-                    this.loading = false;
-                }
+    <div class="ui container" x-data="{
+        orders: [],
+        loading: true,
+        error: null,
+        message: null,
+        selectedOrder: null,
+        baseUrl: 'http://172.17.100.14:3383/default',
+        defaultImages: {
+            products: '/spa/assets/default-product-image.png',
+            avatars: '/spa/assets/default-avatar.png'
+        },
+        getImageUrl(item, type = 'products') {
+            const imageField = type === 'products' ? 'image_url' : 'avatar';
+            const defaultImage = this.defaultImages[type];
+
+            if (!item || !item[imageField]) {
+                console.debug(`No ${imageField} for:`, item?.name);
+                return defaultImage;
             }
-         }"
-         x-init="fetchOrders">
+
+            try {
+                const imagePath = item[imageField];
+                if (!imagePath) return defaultImage;
+
+                // Handle full URLs
+                if (imagePath.startsWith('http')) {
+                    return imagePath;
+                }
+
+                // Handle relative paths
+                const filename = imagePath.split('/').pop();
+                const mediaUrl = `${this.baseUrl}/media/avatars/${filename}`;
+                
+                // Add debug logging
+                console.debug(`Loading ${type} image:`, {
+                    original: imagePath,
+                    processed: mediaUrl,
+                    item: item.name || 'unknown'
+                });
+                console.log('Constructed image URL:', mediaUrl);
+                console.log('Avatar URL:', mediaUrl);
+                
+                return mediaUrl;
+            } catch (error) {
+                console.error(`Error processing ${type} image:`, error);
+                return defaultImage;
+            }
+        },
+        formatDate(date) {
+            return new Date(date).toLocaleString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        },
+        formatPrice(price) {
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD'
+            }).format(price);
+        },
+        async fetchOrders() {
+            try {
+                this.loading = true;
+                const response = await fetch(`${this.baseUrl}/api/payments/`, {
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch orders: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                // Debug logging
+                data.forEach(order => {
+                    console.debug('Order:', {
+                        id: order.id,
+                        name: order.name,
+                        avatar: order.avatar,
+                        products: order.products.map(p => ({
+                            id: p.id,
+                            name: p.name,
+                            image_url: p.image_url
+                        }))
+                    });
+                });
+                
+                this.orders = data;
+            } catch (error) {
+                this.error = `Error fetching orders: ${error.message}`;
+                console.error('Fetch orders error:', error);
+            } finally {
+                this.loading = false;
+            }
+        }
+    }" x-init="fetchOrders">
 
         <!-- Navigation -->
-        <div class="ui top attached menu">
-            <a href="index.html#product/product_display" class="item">
-                <i class="shopping bag icon"></i> Products
-            </a>
-            <a href="index.html#product/view_cart" class="item">
-                <i class="shopping cart icon"></i> Cart
-            </a>
-            <div class="active right item">
-                <i class="history icon"></i> Order History
+        <div class="navbar">
+            <div class="ui container">
+                <div class="ui secondary pointing menu">
+                    <div class="item">
+                        <h2 class="ui header">
+                            <i class="shopping bag icon"></i>
+                            <div class="content">Product Store</div>
+                        </h2>
+                    </div>
+                    <div class="right menu">
+                        <a href="index.html#product/product_display" class="item">
+                            <i class="shopping bag icon"></i> Products
+                        </a>
+                        <a href="index.html#product/view_cart" class="item">
+                            <i class="shopping cart icon"></i> Cart
+                        </a>
+                        <div class="active item">
+                            <i class="history icon"></i> Order History
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Messages -->
+        <div class="messages">
+            <div class="ui negative message" x-show.transition="error" x-cloak>
+                <i class="close icon" @click="error = null"></i>
+                <div class="content" x-text="error"></div>
+            </div>
+            <div class="ui positive message" x-show.transition="message" x-cloak>
+                <i class="close icon" @click="message = null"></i>
+                <div class="content" x-text="message"></div>
             </div>
         </div>
 
         <!-- Main Content -->
-        <div class="ui attached segment">
+        <div class="order-segment">
             <!-- Loading State -->
-            <div class="ui active dimmer" x-show="loading" x-cloak>
-                <div class="ui loader"></div>
-            </div>
-
-            <!-- Error Message -->
-            <div class="ui negative message" x-show="error" x-cloak>
-                <i class="close icon" @click="error = null"></i>
-                <div class="content" x-text="error"></div>
+            <div class="ui active dimmer" x-show.transition="loading" x-cloak>
+                <div class="ui text loader">Loading orders...</div>
             </div>
 
             <!-- Orders List -->
-            <div x-show="!loading && orders.length > 0">
+            <div x-show="!loading && orders.length > 0" class="order-list">
                 <template x-for="order in orders" :key="order.id">
-                    <div class="ui raised segment" :class="{ 'active': selectedOrder === order }">
+                    <div class="order-card">
                         <!-- Order Header -->
-                        <div class="ui grid">
-                            <div class="eight wide column">
-                                <h3 class="ui header">
-                                    <i class="shopping bag icon"></i>
-                                    <div class="content">
-                                        Order #<span x-text="order.id"></span>
-                                        <div class="sub header" x-text="formatDate(order.created_at)"></div>
-                                    </div>
-                                </h3>
-                            </div>
-                            <div class="eight wide right aligned column">
-                                <div class="ui label" 
-                                     :class="{
-                                         'blue': order.payment_method === 'paypal',
-                                         'green': order.payment_method === 'gcash',
-                                         'purple': order.payment_method === 'maya'
-                                     }">
-                                    <i class="payment icon"></i>
-                                    <span x-text="order.payment_method"></span>
+                        <div class="content">
+                            <div class="ui grid">
+                                <div class="eight wide column">
+                                    <h3 class="ui header">
+                                        <i class="shopping bag icon"></i>
+                                        <div class="content">
+                                            Order #<span x-text="order.id"></span>
+                                            <div class="sub header" x-text="formatDate(order.created_at)"></div>
+                                        </div>
+                                    </h3>
                                 </div>
-                                <div class="ui label">
-                                    <i class="money bill alternate icon"></i>
-                                    <span x-text="formatPrice(order.total_amount)"></span>
+                                <div class="eight wide right aligned column">
+                                    <div class="ui label" 
+                                         :class="{
+                                             'blue': order.payment_method === 'paypal',
+                                             'green': order.payment_method === 'gcash',
+                                             'purple': order.payment_method === 'maya'
+                                         }">
+                                        <i class="payment icon"></i>
+                                        <span x-text="order.payment_method"></span>
+                                    </div>
+                                    <div class="ui label">
+                                        <i class="money bill alternate icon"></i>
+                                        <span x-text="formatPrice(order.total_amount)"></span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
                         <!-- Customer Details -->
-                        <div class="ui segments">
-                            <div class="ui secondary segment">
-                                <h4 class="ui header">Customer Information</h4>
-                            </div>
-                            <div class="ui segment">
-                                <div class="ui list">
-                                    <div class="item">
-                                        <i class="user icon"></i>
-                                        <div class="content" x-text="order.name"></div>
-                                    </div>
-                                    <div class="item">
-                                        <i class="mail icon"></i>
-                                        <div class="content" x-text="order.email"></div>
-                                    </div>
-                                    <div class="item">
-                                        <i class="map marker alternate icon"></i>
-                                        <div class="content" x-text="order.address"></div>
+                        <div class="content customer-details">
+                            <h4 class="ui sub header">Customer Information</h4>
+                            <div class="ui grid">
+                                <div class="four wide column">
+                                    <!-- For avatar images -->
+                                    <img :src="getImageUrl(order, 'avatars')"
+                                         :alt="'Avatar of ' + order.name"
+                                         class="ui small circular image"
+                                         loading="lazy"
+                                         @error="(e) => { 
+                                             console.debug('Avatar load failed:', order.name);
+                                             e.target.src = defaultImages.avatars;
+                                         }">
+                                </div>
+                                <div class="twelve wide column">
+                                    <div class="ui list">
+                                        <div class="item">
+                                            <i class="user icon"></i>
+                                            <div class="content" x-text="order.name"></div>
+                                        </div>
+                                        <div class="item">
+                                            <i class="mail icon"></i>
+                                            <div class="content" x-text="order.email"></div>
+                                        </div>
+                                        <div class="item">
+                                            <i class="map marker alternate icon"></i>
+                                            <div class="content" x-text="order.address"></div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Products List -->
-                        <div class="ui segments">
-                            <div class="ui secondary segment">
-                                <h4 class="ui header">
-                                    Ordered Items
-                                    <button class="ui basic right floated button" 
-                                            @click="selectedOrder = selectedOrder === order ? null : order">
-                                        <i class="icon" :class="selectedOrder === order ? 'chevron up' : 'chevron down'"></i>
-                                        <span x-text="selectedOrder === order ? 'Hide Details' : 'Show Details'"></span>
-                                    </button>
-                                </h4>
-                            </div>
-                            
-                            <div class="ui segment" x-show="selectedOrder === order" x-transition>
-                                <div class="ui three stackable cards">
-                                    <template x-for="product in order.products" :key="product.id">
-                                        <div class="ui fluid card">
-                                            <div class="blurring dimmable image">
-                                                <img :src="product.image || 'https://via.placeholder.com/300x200'" 
-                                                     :alt="product.name"
-                                                     @error="$event.target.src='https://via.placeholder.com/300x200'">
+                        <!-- Products List in order-card -->
+                        <div class="content">
+                            <h4 class="ui sub header">
+                                Ordered Items
+                                <button class="ui basic right floated button" 
+                                        @click="selectedOrder = selectedOrder === order ? null : order">
+                                    <i class="icon" :class="selectedOrder === order ? 'chevron up' : 'chevron down'"></i>
+                                    <span x-text="selectedOrder === order ? 'Hide Details' : 'Show Details'"></span>
+                                </button>
+                            </h4>
+                            <div class="ui relaxed divided items" x-show="selectedOrder === order" x-transition>
+                                <template x-for="product in order.products" :key="product.id">
+                                    <div class="item">
+                                        <div class="ui tiny image">
+                                            <!-- For product images -->
+                                            <img :src="getImageUrl(product, 'products')" 
+                                                 :alt="product.name"
+                                                 class="ui tiny image"
+                                                 loading="lazy"
+                                                 @error="(e) => {
+                                                     console.debug('Product image load failed:', product.name);
+                                                     e.target.src = defaultImages.products;
+                                                 }">
+                                        </div>
+                                        <div class="content">
+                                            <div class="header" x-text="product.name"></div>
+                                            <div class="meta">
+                                                <span x-text="formatPrice(product.price)"></span>
                                             </div>
-                                            <div class="content">
-                                                <div class="header" x-text="product.name"></div>
-                                                <div class="meta">
-                                                    <span class="date" x-text="'Ordered: ' + formatDate(order.created_at)"></span>
-                                                </div>
-                                                <div class="description" x-text="product.description"></div>
-                                            </div>
-                                            <div class="extra content">
-                                                <div class="ui two statistics">
-                                                    <div class="statistic">
-                                                        <div class="value">
-                                                            <small x-text="formatPrice(product.price)"></small>
-                                                        </div>
-                                                        <div class="label">Unit Price</div>
-                                                    </div>
-                                                    <div class="statistic">
-                                                        <div class="value" x-text="product.quantity"></div>
-                                                        <div class="label">Quantity</div>
-                                                    </div>
-                                                </div>
-                                                <div class="ui divider"></div>
-                                                <div class="ui right aligned">
-                                                    <strong>Subtotal: </strong>
-                                                    <span x-text="formatPrice(product.price * product.quantity)"></span>
-                                                </div>
+                                            <div class="description">
+                                                <p x-text="'Quantity: ' + product.quantity"></p>
+                                                <p x-text="'Subtotal: ' + formatPrice(product.price * product.quantity)"></p>
                                             </div>
                                         </div>
-                                    </template>
-                                </div>
+                                    </div>
+                                </template>
                             </div>
                         </div>
                     </div>
@@ -177,11 +265,12 @@
             </div>
 
             <!-- Empty State -->
-            <div class="ui placeholder segment" x-show="!loading && orders.length === 0">
+            <div class="empty-state" x-show="!loading && orders.length === 0">
                 <div class="ui icon header">
-                    <i class="history icon"></i>
+                    <i class="history icon large"></i>
                     No Orders Found
                 </div>
+                <p>Start shopping to view your order history!</p>
                 <a href="index.html#product/product_display" class="ui primary button">
                     <i class="shopping cart icon"></i>
                     Start Shopping
@@ -191,61 +280,382 @@
     </div>
 
     <style>
-        [x-cloak] { 
-            display: none !important; 
+        @font-face {
+            font-family: 'icons';
+            src: url('/spa/assets/fonts/icons.woff2') format('woff2');
+            font-weight: normal;
+            font-style: normal;
+            font-display: swap;
         }
-        
-        .ui.fluid.card {
-            margin-bottom: 1.5em;
+
+        :root {
+            --primary-color: #2185d0;
+            --secondary-color: #21ba45;
+            --danger-color: #db2828;
+            --text-color: #000;
+            --light-gray: #fff;
+            --gray: #666;
         }
-        
-        .ui.fluid.card .image {
-            height: 200px;
-            background: #f9f9f9;
+
+        body {
+            background-color: var(--light-gray);
+            color: var(--text-color);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+        }
+
+        [x-cloak] {
+            display: none !important;
+        }
+
+        .navbar {
+            background: var(--light-gray);
+            padding: 1rem 0;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            margin-bottom: 1rem;
+        }
+
+        .ui.secondary.pointing.menu {
+            border-bottom: 2px solid #ddd;
+            margin-bottom: 0;
+        }
+
+        .ui.secondary.pointing.menu .item {
+            padding: 0.5rem 1rem;
+            font-weight: normal;
+            font-size: 1rem;
+            color: var(--text-color);
+            transition: all 0.3s ease;
+        }
+
+        .ui.secondary.pointing.menu .item:hover,
+        .ui.secondary.pointing.menu .active.item {
+            color: var(--primary-color);
+            border-bottom: 2px solid var(--primary-color);
+        }
+
+        .ui.secondary.pointing.menu .header.item {
+            padding: 0.5rem 1rem;
+            font-size: 1.5rem;
+            color: var(--primary-color);
+        }
+
+        .order-segment {
+            background: var(--light-gray);
+            padding: 1rem;
+        }
+
+        .messages {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 1000;
+            width: 300px;
+        }
+
+        .ui.message {
+            margin-bottom: 1rem;
+            padding: 0.75rem;
+            border-left: 4px solid;
+        }
+
+        .ui.negative.message {
+            background: #fff5f5;
+            border-left-color: var(--danger-color);
+        }
+
+        .ui.positive.message {
+            background: #f0fff4;
+            border-left-color: var(--secondary-color);
+        }
+
+        .ui.message .close.icon {
+            cursor: pointer;
+            opacity: 0.6;
+            transition: opacity 0.2s;
+        }
+
+        .ui.message .close.icon:hover {
+            opacity: 1;
+        }
+
+        .ui.dimmer {
+            background: rgba(0,0,0,0.7);
+        }
+
+        .ui.text.loader {
+            color: #fff;
+        }
+
+        .order-list {
+            margin: 1rem 0;
+        }
+
+        .order-card {
+            margin: 1rem 0;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .order-card .content {
+            padding: 1rem 0;
+        }
+
+        .order-card .ui.header {
+            margin: 0;
+            font-size: 1.25rem;
+            font-weight: bold;
+        }
+
+        .order-card .sub.header {
+            font-size: 0.9rem;
+            color: var(--gray);
+            font-weight: normal;
+        }
+
+        .order-card .ui.label {
+            margin: 0 0.5rem;
+            padding: 0.5rem 1rem;
+            font-size: 0.9rem;
+            border-radius: 15px;
+        }
+
+        .customer-details {
+            margin: 1rem 0;
+        }
+
+        .ui.small.circular.image {
+            width: 60px !important;
+            height: 60px !important;
+            object-fit: cover;
+            border-radius: 50%;
+        }
+
+        .ui.list .item {
+            margin: 0.5rem 0;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+        }
+
+        .ui.list .item .icon {
+            color: var(--gray);
+            margin-right: 0.75rem;
+        }
+
+        .ui.list .item .content {
+            color: var(--text-color);
+        }
+
+        .ui.relaxed.divided.list .item {
+            padding: 0.75rem 0;
+        }
+
+        .ui.relaxed.divided.list .item .header {
+            font-size: 1.1rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+
+        .ui.relaxed.divided.list .item .description p {
+            margin: 0.25rem 0;
+            font-size: 0.95rem;
+            color: var(--text-color);
+        }
+
+        .ui.basic.button {
+            color: #fff;
+            background: var(--primary-color);
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            font-weight: normal;
+        }
+
+        .ui.basic.button:hover {
+            background: #1a73b8;
+        }
+
+        .empty-state {
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .empty-state .ui.icon.header {
+            margin-bottom: 1rem;
+        }
+
+        .empty-state .large.icon {
+            font-size: 2rem;
+            color: var(--gray);
+        }
+
+        .empty-state p {
+            font-size: 1rem;
+            color: var(--gray);
+            margin-bottom: 1rem;
+        }
+
+        .empty-state .ui.button {
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            background: var(--primary-color);
+            color: #fff;
+        }
+
+        .empty-state .ui.button:hover {
+            background: #1a73b8;
+        }
+
+        @media only screen and (max-width: 767px) {
+            .ui.container {
+                padding: 0.5rem;
+            }
+
+            .navbar {
+                padding: 0.5rem;
+            }
+
+            .ui.secondary.pointing.menu .item {
+                padding: 0.5rem;
+                font-size: 0.9rem;
+            }
+
+            .ui.secondary.pointing.menu .header.item {
+                font-size: 1.2rem;
+            }
+
+            .order-segment {
+                padding: 0.5rem;
+            }
+
+            .messages {
+                top: 0.5rem;
+                right: 0.5rem;
+                width: 90%;
+            }
+
+            .order-card {
+                margin: 0.5rem 0;
+            }
+
+            .order-card .content {
+                padding: 0.5rem 0;
+            }
+
+            .ui.grid > .column {
+                padding: 0.25rem !important;
+            }
+
+            .ui.small.circular.image {
+                width: 48px !important;
+                height: 48px !important;
+            }
+
+            .ui.relaxed.divided.list .item .header {
+                font-size: 1rem;
+            }
+
+            .empty-state {
+                padding: 1.5rem;
+            }
+
+            .empty-state .large.icon {
+                font-size: 1.5rem;
+            }
+        }
+
+        @media only screen and (max-width: 480px) {
+            .ui.secondary.pointing.menu {
+                flex-wrap: wrap;
+            }
+
+            .ui.secondary.pointing.menu .right.menu {
+                margin-top: 0.5rem;
+            }
+
+            .ui.grid > .four.wide.column {
+                display: none !important;
+            }
+
+            .ui.grid > .twelve.wide.column {
+                width: 100% !important;
+            }
+        }
+
+        /* Add to your existing style section */
+        .ui.items .item {
+            display: flex;
+            align-items: start;
+            padding: 1rem 0;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+        }
+
+        .ui.items .item:last-child {
+            border-bottom: none;
+        }
+
+        .ui.items .item .ui.tiny.image {
+            width: 100px !important;
+            height: 100px !important;
+            margin-right: 1rem;
+            border-radius: 4px;
             overflow: hidden;
+            background: #f5f5f5;
         }
-        
-        .ui.fluid.card .image img {
+
+        .ui.items .item .ui.tiny.image img {
             width: 100%;
             height: 100%;
             object-fit: cover;
         }
-        
-        .ui.raised.segment {
-            margin: 1rem 0;
-            transition: box-shadow 0.2s ease;
+
+        .ui.items .item .content {
+            flex: 1;
         }
-        
-        .ui.raised.segment:hover {
+
+        .ui.items .item .content .header {
+            font-size: 1.1em;
+            font-weight: bold;
+            margin-bottom: 0.5em;
+        }
+
+        .ui.items .item .content .meta {
+            color: rgba(0,0,0,0.6);
+            margin-bottom: 0.5em;
+        }
+
+        .ui.items .item .content .description {
+            color: rgba(0,0,0,0.7);
+        }
+
+        /* Improve avatar image styles */
+        .customer-details .ui.small.circular.image {
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            background: #f5f5f5;
         }
-        
-        .ui.statistics {
-            margin: 1em 0;
+
+        /* Add loading animation */
+        .ui.image.loading {
+            position: relative;
+            overflow: hidden;
         }
-        
-        .ui.statistics .statistic .value small {
-            font-size: 0.75em;
+
+        .ui.image.loading::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
         }
-        
-        .ui.segments {
-            margin-top: 1.5em;
-        }
-        
-        .description {
-            margin: 1em 0;
-            line-height: 1.5;
-        }
-        
-        @media only screen and (max-width: 767px) {
-            .ui.stackable.cards {
-                margin-left: 0 !important;
-                margin-right: 0 !important;
-            }
-            
-            .ui.fluid.card {
-                margin: 1em 0;
-            }
+
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
         }
     </style>
 </body>

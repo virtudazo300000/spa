@@ -4,18 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Checkout - Online Store</title>
+    
+    <!-- Preload critical resources -->
+    <link rel="preload" href="/spa/assets/fonts/icons.woff2" as="font" type="font/woff2" crossorigin>
+    
+    <!-- Existing scripts and stylesheets -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.js"></script>
-    <script src="//unpkg.com/alpinejs" defer></script>
+    <script src="https://unpkg.com/alpinejs@3.14.8/dist/cdn.min.js" defer></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.css">
 </head>
 <body>
-    <div class="ui container" style="padding: 2rem;"
-         x-data="checkoutData()"
-         x-init="fetchSelectedItems()">
-
+    <div class="ui container checkout-container" x-data="checkoutData()" x-init="initCheckout">
         <!-- Navigation -->
-        <div class="ui top attached menu">
+        <div class="ui top attached secondary pointing menu">
             <a href="index.html#product/product_display" class="item">
                 <i class="shop icon"></i> Products
             </a>
@@ -27,61 +29,66 @@
             </div>
         </div>
 
-        <div class="ui attached segment">
+        <div class="ui attached segment checkout-segment">
             <!-- Header -->
-            <h2 class="ui header">
+            <h2 class="ui header checkout-header">
                 <i class="shopping bag icon"></i>
                 <div class="content">
                     Secure Checkout
-                    <div class="sub header">Please complete your purchase</div>
+                    <div class="sub header">Complete your purchase securely</div>
                 </div>
             </h2>
 
             <!-- Messages -->
-            <div class="ui negative message" x-show="error" x-cloak>
+            <div class="ui negative message" x-show.transition="error" x-cloak>
                 <i class="close icon" @click="error = null"></i>
                 <div class="header">Error</div>
                 <p x-text="error"></p>
             </div>
 
-            <div class="ui positive message" x-show="message" x-cloak>
+            <div class="ui positive message" x-show.transition="message" x-cloak>
                 <i class="close icon" @click="message = null"></i>
                 <div class="header">Success</div>
                 <p x-text="message"></p>
             </div>
 
             <!-- Loading State -->
-            <div class="ui active dimmer" x-show="loading" x-cloak>
+            <div class="ui active dimmer" x-show.transition="loading" x-cloak>
                 <div class="ui text loader">Processing your order...</div>
             </div>
 
             <div class="ui two column stackable grid">
                 <!-- Left Column - Order Summary -->
                 <div class="column">
-                    <div class="ui raised segment">
+                    <div class="ui raised segment order-summary">
                         <h3 class="ui dividing header">
                             <i class="list icon"></i> Order Summary
                         </h3>
                         
                         <!-- Cart Items -->
-                        <div class="ui divided items">
+                        <div class="ui divided relaxed items">
                             <template x-for="item in cartItems" :key="item.id">
                                 <div class="item">
                                     <div class="image">
-                                        <img :src="item.product.image_url || 'https://via.placeholder.com/100'" 
-                                             :alt="item.product.name">
+                                        <img :src="getImageUrl(item.product)" 
+                                             :alt="item.product.name"
+                                             class="product-image"
+                                             loading="lazy"
+                                             @error="(e) => {
+                                                 console.error('Image load error:', item.product.name);
+                                                 e.target.src = '/spa/assets/default-product-image.png';
+                                             }">
                                     </div>
                                     <div class="content">
-                                        <div class="header" x-text="item.product.name"></div>
                                         <div class="meta">
-                                            <span class="ui label" x-text="'Quantity: ' + item.quantity"></span>
+                                            <span class="ui small label" x-text="'Quantity: ' + item.quantity"></span>
                                         </div>
                                         <div class="description">
                                             <p x-text="item.product.description"></p>
                                         </div>
                                         <div class="extra">
-                                            <div class="ui label" x-text="'Price: $' + item.product.price"></div>
-                                            <div class="ui label" x-text="'Total: $' + (item.product.price * item.quantity).toFixed(2)"></div>
+                                            <div class="ui small label" x-text="'Price: $' + item.product.price"></div>
+                                            <div class="ui small label" x-text="'Total: $' + (item.product.price * item.quantity).toFixed(2)"></div>
                                         </div>
                                     </div>
                                 </div>
@@ -90,7 +97,7 @@
 
                         <!-- Total Amount -->
                         <div class="ui divider"></div>
-                        <div class="ui large statistic">
+                        <div class="ui statistic">
                             <div class="value">
                                 <i class="dollar sign icon"></i>
                                 <span x-text="totalAmount.toFixed(2)"></span>
@@ -102,7 +109,7 @@
 
                 <!-- Right Column - Payment Form -->
                 <div class="column">
-                    <div class="ui raised segment">
+                    <div class="ui raised segment payment-form">
                         <h3 class="ui dividing header">
                             <i class="payment icon"></i> Payment Information
                         </h3>
@@ -113,7 +120,7 @@
                                 <div class="ui left icon input">
                                     <i class="user icon"></i>
                                     <input type="text" 
-                                           x-model="paymentForm.name"
+                                           x-model.debounce="paymentForm.name"
                                            placeholder="Enter your full name"
                                            required>
                                 </div>
@@ -124,7 +131,7 @@
                                 <div class="ui left icon input">
                                     <i class="envelope icon"></i>
                                     <input type="email"
-                                           x-model="paymentForm.email"
+                                           x-model.debounce="paymentForm.email"
                                            placeholder="Enter your email"
                                            required>
                                 </div>
@@ -134,16 +141,44 @@
                                 <label>Delivery Address</label>
                                 <div class="ui left icon input">
                                     <i class="home icon"></i>
-                                    <textarea x-model="paymentForm.address"
+                                    <textarea x-model.debounce="paymentForm.address"
                                               placeholder="Enter your complete address"
                                               rows="3"
                                               required></textarea>
                                 </div>
                             </div>
 
+                            <div class="field">
+                                <label>Avatar (Optional)</label>
+                                <div class="ui action input avatar-upload">
+                                    <input type="file" 
+                                           id="avatarInput"
+                                           accept="image/jpeg,image/png"
+                                           @change="handleAvatarUpload"
+                                           style="display: none">
+                                    <label for="avatarInput" class="ui icon button">
+                                        <i class="upload icon"></i>
+                                        Choose Avatar
+                                    </label>
+                                    <div class="ui basic label" x-text="paymentForm.avatarName || 'No file chosen'"></div>
+                                </div>
+                                <div class="error-text" x-show="errors.avatar" x-text="errors.avatar"></div>
+                                <div x-show="avatarPreview" class="ui segment avatar-preview" style="margin-top: 1rem;">
+                                    <img :src="avatarPreview" 
+                                         class="preview-image"
+                                         style="max-width: 80px; max-height: 80px; object-fit: cover; border-radius: 4px;">
+                                    <button type="button"
+                                            class="ui red mini circular icon button"
+                                            @click.prevent="clearAvatar"
+                                            style="position: absolute; top: -10px; right: -10px;">
+                                        <i class="times icon"></i>
+                                    </button>
+                                </div>
+                            </div>
+
                             <div class="required field">
                                 <label>Payment Method</label>
-                                <select class="ui dropdown"
+                                <select class="ui fluid dropdown"
                                         x-model="paymentForm.payment_method"
                                         required>
                                     <option value="">Select Payment Method</option>
@@ -153,7 +188,7 @@
                                 </select>
                             </div>
 
-                            <button class="ui primary fluid large button"
+                            <button class="ui primary fluid large button submit-button"
                                     type="submit"
                                     :disabled="!validateForm() || loading">
                                 <i class="lock icon"></i>
@@ -176,19 +211,42 @@
                 loading: false,
                 error: null,
                 message: null,
-                baseUrl: 'http://172.17.100.14:3329/default',
+                baseUrl: 'http://172.17.100.14:3383/default',
+                avatarPreview: null,
+                errors: {},
                 paymentForm: {
                     name: '',
                     email: '',
                     address: '',
+                    avatar: null,
+                    avatarName: '',
                     payment_method: ''
+                },
+
+                async initCheckout() {
+                    console.log('Initializing checkout...');
+                    try {
+                        await this.fetchSelectedItems();
+                    } catch (error) {
+                        console.error('Initialization error:', error);
+                        this.error = 'Failed to initialize checkout: ' + error.message;
+                    }
                 },
 
                 async fetchSelectedItems() {
                     try {
                         this.loading = true;
-                        const selectedIds = JSON.parse(sessionStorage.getItem('checkoutItems') || '[]');
-                        
+                        let selectedIds = [];
+                        try {
+                            const storedItems = sessionStorage.getItem('checkoutItems');
+                            selectedIds = storedItems ? JSON.parse(storedItems) : [];
+                            console.log('Selected IDs:', selectedIds);
+                        } catch (storageError) {
+                            console.error('Storage access error:', storageError);
+                            this.error = 'Unable to access storage. Please ensure this page is served over HTTP/HTTPS.';
+                            return;
+                        }
+
                         if (!selectedIds.length) {
                             throw new Error('No items selected for checkout');
                         }
@@ -199,11 +257,13 @@
                             }
                         });
                         
+                        console.log('Fetch cart items response status:', response.status);
                         if (!response.ok) {
                             throw new Error(`Failed to fetch cart items: ${response.statusText}`);
                         }
                         
                         const allItems = await response.json();
+                        console.log('All cart items:', allItems);
                         this.cartItems = allItems.filter(item => selectedIds.includes(item.id));
                         
                         if (!this.cartItems.length) {
@@ -211,13 +271,64 @@
                         }
 
                         this.calculateTotal();
-                        console.log('Cart items loaded:', this.cartItems);
+                        console.log('Filtered cart items:', this.cartItems);
                     } catch (error) {
                         this.error = error.message;
                         console.error('Error fetching items:', error);
                     } finally {
                         this.loading = false;
                     }
+                },
+
+                handleAvatarUpload(event) {
+                    const file = event.target.files[0];
+                    if (file) {
+                        // Validate file size (2MB limit)
+                        if (file.size > 2 * 1024 * 1024) {
+                            this.errors.avatar = 'Avatar size should be less than 2MB';
+                            event.target.value = '';
+                            return;
+                        }
+                        
+                        // Validate file type
+                        if (!['image/jpeg', 'image/png'].includes(file.type)) {
+                            this.errors.avatar = 'Only JPG and PNG images are allowed';
+                            event.target.value = '';
+                            return;
+                        }
+
+                        // Generate a clean filename with timestamp
+                        const timestamp = new Date().getTime();
+                        const fileExt = file.name.split('.').pop().toLowerCase();
+                        const fileName = `avatar_${timestamp}.${fileExt}`;
+
+                        // Read file as base64
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                            this.paymentForm.avatar = reader.result;
+                            this.paymentForm.avatarName = fileName;
+                            this.avatarPreview = reader.result;
+                            this.errors.avatar = '';
+                            console.log('Avatar prepared:', {
+                                name: fileName,
+                                type: file.type,
+                                size: file.size
+                            });
+                        };
+                        reader.onerror = () => {
+                            this.errors.avatar = 'Failed to read avatar file';
+                            event.target.value = '';
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                },
+
+                clearAvatar() {
+                    this.paymentForm.avatar = null;
+                    this.paymentForm.avatarName = '';
+                    this.avatarPreview = null;
+                    this.errors.avatar = '';
+                    document.getElementById('avatarInput').value = '';
                 },
 
                 calculateTotal() {
@@ -265,35 +376,57 @@
 
                         console.log('Response status:', response.status);
                         const result = await response.json();
+                        console.log('Response data:', result);
 
                         if (!response.ok) {
-                            throw new Error(result.detail || 'Payment failed');
+                            throw new Error(result.detail || `Payment failed with status ${response.status}: ${JSON.stringify(result)}`);
                         }
 
                         console.log('Payment successful:', result);
 
-                        sessionStorage.setItem('orderDetails', JSON.stringify({
-                            orderId: result.order_id,
-                            amount: this.totalAmount,
-                            items: this.cartItems,
-                            customerName: this.paymentForm.name,
-                            customerEmail: this.paymentForm.email,
-                            customerAddress: this.paymentForm.address,
-                            paymentMethod: this.paymentForm.payment_method,
-                            orderDate: new Date().toISOString()
-                        }));
+                        try {
+                            sessionStorage.setItem('orderDetails', JSON.stringify({
+                                orderId: result.order_id,
+                                amount: this.totalAmount,
+                                items: this.cartItems,
+                                customerName: this.paymentForm.name,
+                                customerEmail: this.paymentForm.email,
+                                customerAddress: this.paymentForm.address,
+                                paymentMethod: this.paymentForm.payment_method,
+                                orderDate: new Date().toISOString()
+                            }));
+                            sessionStorage.removeItem('checkoutItems');
+                        } catch (storageError) {
+                            console.error('Storage error during order save:', storageError);
+                            this.error = 'Payment succeeded, but failed to save order details locally. Check storage permissions.';
+                            return;
+                        }
 
-                        sessionStorage.removeItem('checkoutItems');
                         this.message = 'Payment successful! Redirecting...';
                         
                         setTimeout(() => {
+                            console.log('Redirecting to order list...');
                             window.location.href = 'index.html#product/order_list';
                         }, 1500);
                     } catch (error) {
-                        this.error = error.message;
+                        this.error = `Payment failed: ${error.message}`;
                         console.error('Payment Error:', error);
                     } finally {
                         this.loading = false;
+                    }
+                },
+
+                getImageUrl(product, type = 'products') {
+                    if (!product?.image_url) {
+                        console.warn('No image URL for:', product?.name);
+                        return '/spa/assets/default-product-image.png';
+                    }
+                    try {
+                        const url = new URL(product.image_url);
+                        return `${this.baseUrl}/media/${type}/${url.pathname.split('/').pop()}`;
+                    } catch (e) {
+                        console.error('Invalid image URL:', product?.image_url);
+                        return '/spa/assets/default-product-image.png';
                     }
                 }
             };
@@ -306,27 +439,373 @@
     </script>
 
     <style>
-        [x-cloak] { display: none !important; }
+        @font-face {
+            font-family: 'icons';
+            src: url('/spa/assets/fonts/icons.woff2') format('woff2');
+            font-weight: normal;
+            font-style: normal;
+            font-display: swap;
+        }
+
+        /* General Reset and Base Styles */
+        body {
+            background-color: #f5f7fa;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        [x-cloak] {
+            display: none !important;
+        }
+
+        .checkout-container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+
+        /* Navigation */
+        .ui.secondary.pointing.menu {
+            background-color: #fff;
+            border-radius: 8px 8px 0 0;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            margin-bottom: 0;
+        }
+
+        .ui.secondary.pointing.menu .item {
+            padding: 1rem;
+            font-weight: 500;
+            color: #333;
+            transition: color 0.2s ease;
+        }
+
+        .ui.secondary.pointing.menu .item:hover,
+        .ui.secondary.pointing.menu .active.item {
+            color: #1e88e5;
+            border-bottom: 2px solid #1e88e5;
+        }
+
+        /* Segment */
+        .checkout-segment {
+            border-radius: 0 0 8px 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            background-color: #fff;
+            padding: 2rem;
+        }
+
+        /* Header */
+        .checkout-header {
+            margin-bottom: 2rem;
+            color: #222;
+        }
+
+        .checkout-header .content {
+            font-size: 1.8rem;
+            font-weight: 600;
+        }
+
+        .checkout-header .sub.header {
+            font-size: 1rem;
+            color: #666;
+            margin-top: 0.25rem;
+        }
+
+        /* Messages */
+        .ui.message {
+            border-radius: 6px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            margin-bottom: 1.5rem;
+            transition: opacity 0.3s ease;
+        }
+
+        .ui.negative.message {
+            background-color: #fff5f5;
+            border-left: 4px solid #e53935;
+        }
+
+        .ui.positive.message {
+            background-color: #f0fff4;
+            border-left: 4px solid #43a047;
+        }
+
+        .ui.message .header {
+            font-size: 1.1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .ui.message .close.icon {
+            cursor: pointer;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+        }
+
+        .ui.message .close.icon:hover {
+            opacity: 1;
+        }
+
+        /* Loading Dimmer */
+        .ui.dimmer {
+            background-color: rgba(0, 0, 0, 0.6);
+            transition: opacity 0.3s ease;
+        }
+
+        .ui.text.loader {
+            color: #fff;
+        }
+
+        /* Grid */
+        .ui.two.column.grid {
+            margin: 0 -1rem;
+        }
+
+        .ui.two.column.grid > .column {
+            padding: 1rem;
+        }
+
+        /* Order Summary */
+        .order-summary {
+            border-radius: 8px;
+            padding: 1.5rem;
+            background-color: #fafafa;
+        }
+
+        .order-summary .ui.dividing.header {
+            font-size: 1.4rem;
+            margin-bottom: 1.5rem;
+            color: #222;
+        }
+
+        .ui.divided.relaxed.items .item {
+            padding: 1rem 0;
+            align-items: center;
+        }
+
         .ui.items .item .image {
-            width: 100px !important;
-            height: 100px !important;
-            margin-right: 1em;
+            width: 80px !important;
+            height: 80px !important;
+            margin-right: 1.5rem;
+            border-radius: 6px;
+            overflow: hidden;
         }
-        .ui.items .item .image img {
-            width: 100%;
-            height: 100%;
+
+        .product-image {
+            width: 100% !important;
+            height: 100% !important;
             object-fit: cover;
+            background-color: #f0f0f0;
         }
+
+        .ui.items .item .content .header {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #222;
+        }
+
+        .ui.items .item .meta {
+            margin: 0.5rem 0;
+        }
+
+        .ui.items .item .description p {
+            font-size: 0.95rem;
+            color: #666;
+            line-height: 1.5;
+        }
+
+        .ui.items .item .extra .label {
+            font-size: 0.9rem;
+            margin-right: 0.5rem;
+            background-color: #e3f2fd;
+            color: #1e88e5;
+        }
+
+        .ui.statistic {
+            margin-top: 1.5rem;
+        }
+
+        .ui.statistic .value {
+            font-size: 1.8rem;
+            color: #222;
+            font-weight: 700;
+        }
+
+        .ui.statistic .label {
+            font-size: 1rem;
+            color: #666;
+        }
+
+        /* Payment Form */
+        .payment-form {
+            border-radius: 8px;
+            padding: 1.5rem;
+            background-color: #fafafa;
+        }
+
+        .payment-form .ui.dividing.header {
+            font-size: 1.4rem;
+            margin-bottom: 1.5rem;
+            color: #222;
+        }
+
+        .ui.form .field {
+            margin-bottom: 1.5rem;
+        }
+
+        .ui.form .field label {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 0.5rem;
+        }
+
+        .ui.form .ui.input {
+            width: 100%;
+        }
+
+        .ui.form .ui.input input,
         .ui.form textarea {
-            width: 100%;
+            border-radius: 6px;
+            border: 1px solid #e0e0e0;
+            padding: 0.75rem;
+            font-size: 1rem;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .ui.form textarea {
             resize: vertical;
+            min-height: 80px;
         }
-        .ui.selection.dropdown {
-            width: 100%;
+
+        .ui.form .ui.input input:focus,
+        .ui.form textarea:focus {
+            border-color: #1e88e5;
+            box-shadow: 0 0 0 2px rgba(30, 136, 229, 0.1);
+            outline: none;
         }
-        .ui.button:disabled {
-            opacity: 0.45 !important;
+
+        .ui.left.icon.input .icon {
+            color: #666;
+            opacity: 0.7;
+        }
+
+        /* Avatar Upload */
+        .avatar-upload {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .avatar-upload .ui.button {
+            background-color: #e3f2fd;
+            color: #1e88e5;
+            font-weight: 500;
+            transition: background-color 0.2s ease;
+        }
+
+        .avatar-upload .ui.button:hover {
+            background-color: #bbdefb;
+        }
+
+        .avatar-upload .ui.basic.label {
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        .avatar-preview {
+            position: relative;
+            padding: 0.75rem;
+            background-color: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            display: inline-block;
+        }
+
+        .avatar-preview .ui.button {
+            padding: 0.5rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .error-text {
+            color: #e53935;
+            font-size: 0.85rem;
+            margin-top: 0.25rem;
+        }
+
+        /* Dropdown */
+        .ui.fluid.dropdown {
+            border-radius: 6px;
+            border: 1px solid #e0e0e0;
+            font-size: 1rem;
+        }
+
+        .ui.fluid.dropdown > .dropdown.icon {
+            color: #666;
+        }
+
+        .ui.fluid.dropdown .menu {
+            border-radius: 6px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        /* Submit Button */
+        .submit-button {
+            border-radius: 6px;
+            padding: 1rem;
+            font-size: 1.1rem;
+            font-weight: 600;
+            background-color: #1e88e5;
+            transition: background-color 0.2s ease, transform 0.1s ease;
+        }
+
+        .submit-button:hover {
+            background-color: #1565c0;
+            transform: translateY(-1px);
+        }
+
+        .submit-button:active {
+            transform: translateY(0);
+        }
+
+        .submit-button:disabled {
+            opacity: 0.5 !important;
             cursor: not-allowed !important;
+            transform: none;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 767px) {
+            .checkout-container {
+                margin: 1rem auto;
+                padding: 0 0.5rem;
+            }
+
+            .checkout-segment {
+                padding: 1.5rem;
+            }
+
+            .checkout-header .content {
+                font-size: 1.5rem;
+            }
+
+            .ui.two.column.grid {
+                margin: 0;
+            }
+
+            .ui.two.column.grid > .column {
+                padding: 0.5rem;
+            }
+
+            .order-summary,
+            .payment-form {
+                padding: 1rem;
+            }
+
+            .ui.statistic .value {
+                font-size: 1.5rem;
+            }
+
+            .submit-button {
+                font-size: 1rem;
+                padding: 0.75rem;
+            }
         }
     </style>
 </body>

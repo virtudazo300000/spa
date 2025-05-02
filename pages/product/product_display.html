@@ -6,47 +6,323 @@
     <title>Product Display</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.css">
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link rel="preload" href="/spa/assets/fonts/icons.woff2" as="font" type="font/woff2" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        .product-image {
-            width: 100%;
-            height: 200px;
-            object-fit: cover;
+        @font-face {
+            font-family: 'Icons';
+            font-display: swap;
+            src: local('Icons'),
+                 url('/spa/assets/fonts/icons.woff2') format('woff2');
         }
-        [x-cloak] { display: none !important; }
+        :root {
+            --primary-color: #1d4ed8; /* Professional blue */
+            --secondary-color: #15803d; /* Deep green */
+            --danger-color: #b91c1c; /* Refined red */
+            --text-color: #111827; /* Dark gray for readability */
+            --background-color: #f9fafb; /* Soft neutral background */
+            --card-background: #ffffff;
+            --border-color: #e5e7eb;
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+            --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            background-color: var(--background-color);
+            color: var(--text-color);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.5;
+            margin: 0;
+            font-size: 16px;
+        }
+        .navbar {
+            background: var(--card-background);
+            box-shadow: var(--shadow-sm);
+            padding: 1rem 0;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+        .navbar .ui.container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .navbar .ui.header {
+            display: flex;
+            align-items: center;
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--text-color);
+            margin: 0;
+        }
+        .navbar .ui.header .icon {
+            margin-right: 0.5rem;
+            color: var(--primary-color);
+        }
+        .navbar .ui.button {
+            border-radius: 8px;
+            padding: 0.75rem 1.5rem;
+            font-weight: 500;
+            font-size: 0.95rem;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .navbar .ui.button:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-sm);
+        }
+        .product-grid {
+            margin: 2rem 0;
+            padding: 0 1rem;
+        }
+        .product-card {
+            background: var(--card-background);
+            border: 1px solid var(--border-color);
+            border-radius: 12px !important;
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            box-shadow: var(--shadow-sm);
+            display: flex;
+            flex-direction: column;
+        }
+        .product-card:hover {
+            transform: translateY(-6px);
+            box-shadow: var(--shadow-md);
+        }
+        .image-container {
+            width: 100%;
+            height: 240px; /* Fixed height for uniform images */
+            overflow: hidden;
+            background: #f3f4f6;
+            position: relative;
+        }
+        .product-image {
+            object-fit: cover;
+            object-position: center;
+            transition: transform 0.3s ease;
+        }
+        .product-image:hover {
+            transform: scale(1.05);
+        }
+        .product-header {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: var(--text-color);
+            margin: 1rem 0 0.5rem;
+        }
+        .price-tag {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary-color);
+        }
+        .stock-badge {
+            background: var(--secondary-color);
+            color: white;
+            padding: 0.35rem 1rem;
+            border-radius: 9999px;
+            font-size: 0.85rem;
+            margin-left: 0.75rem;
+            font-weight: 500;
+        }
         .cart-badge {
             position: fixed;
-            top: 1rem;
-            right: 1rem;
-            background: #db2828;
+            top: 1.5rem;
+            right: 1.5rem;
+            background: var(--danger-color);
             color: white;
-            border-radius: 50%; 
-            padding: 0.5em 0.8em;
-            font-size: 0.8em;
+            border-radius: 50%;
+            padding: 0.65rem;
+            font-size: 0.95rem;
+            box-shadow: var(--shadow-md);
+            transition: transform 0.3s ease, background 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .cart-badge:hover {
+            transform: scale(1.1);
+            background: #991b1b;
         }
         .edit-controls {
-            margin-bottom: 1rem;
+            background: var(--card-background);
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: var(--shadow-sm);
+            margin-bottom: 2rem;
+        }
+        .add-to-cart-btn {
+            border-radius: 8px;
+            padding: 0.85rem;
+            font-weight: 500;
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+        .add-to-cart-btn:hover:not(.disabled) {
+            transform: translateY(-2px);
+            background: #1e3a8a;
+        }
+        .add-to-cart-btn.disabled {
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+        [x-cloak] {
+            display: none !important;
+        }
+        .messages {
+            position: fixed;
+            top: 1.5rem;
+            right: 1.5rem;
+            z-index: 1000;
+            min-width: 320px;
+        }
+        .messages .ui.message {
+            border-radius: 8px;
+            box-shadow: var(--shadow-md);
+            padding: 1rem 1.5rem;
+            font-weight: 500;
+            font-size: 0.95rem;
+            animation: slideIn 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .messages .ui.message .close.icon {
+            cursor: pointer;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+        }
+        .messages .ui.message .close.icon:hover {
+            opacity: 1;
+        }
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        .ui.form .field {
+            margin-bottom: 1.25rem;
+        }
+        .ui.form label {
+            font-weight: 500;
+            color: var(--text-color);
+            margin-bottom: 0.5rem;
+            display: block;
+        }
+        .ui.form input {
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            padding: 0.75rem;
+            font-size: 0.95rem;
+        }
+        .ui.form .ui.button {
+            border-radius: 6px;
+            padding: 0.75rem 1.25rem;
+            font-size: 0.95rem;
+        }
+        .description {
+            color: #4b5563;
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+            line-height: 1.4;
+        }
+        @media (max-width: 768px) {
+            .product-grid {
+                margin: 1.5rem 0;
+            }
+            .image-container {
+                height: 200px;
+            }
+            .product-header {
+                font-size: 1.2rem;
+            }
+            .price-tag {
+                font-size: 1.3rem;
+            }
+            .cart-badge {
+                top: 1rem;
+                right: 1rem;
+                padding: 0.5rem;
+            }
+            .messages {
+                top: 1rem;
+                right: 1rem;
+                min-width: 280px;
+            }
+        }
+        @media (max-width: 480px) {
+            .navbar .ui.header {
+                font-size: 1.5rem;
+            }
+            .navbar .ui.button {
+                padding: 0.6rem 1rem;
+                font-size: 0.9rem;
+            }
+            .product-grid .ui.cards {
+                display: flex;
+                flex-direction: column;
+                gap: 1.5rem;
+            }
+            .product-card {
+                width: 100%;
+            }
+            .image-container {
+                height: 180px;
+            }
+            .product-header {
+                font-size: 1.1rem;
+            }
+            .price-tag {
+                font-size: 1.2rem;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="ui container" style="padding: 2rem;"
-         x-data="{
+    <div class="ui container" x-data="{
             products: [],
             loading: true,
             error: null,
             message: null,
             cartCount: 0,
             editMode: false,
-            baseUrl: 'http://172.17.100.14:3329/default',
+            baseUrl: 'http://172.17.100.14:3383/default',
             
             async fetchProducts() {
                 try {
+                    this.loading = true;
                     const response = await fetch(`${this.baseUrl}/api/products/`);
-                    if (!response.ok) throw new Error('Failed to fetch products');
-                    this.products = await response.json();
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    const data = await response.json();
+                    data.forEach(product => {
+                        const imageUrl = this.getImageUrl(product);
+                        console.log('Product image:', {
+                            name: product.name,
+                            originalUrl: product.image_url,
+                            processedUrl: imageUrl
+                        });
+                        const img = new Image();
+                        img.src = imageUrl;
+                    });
+                    this.products = data;
                 } catch (error) {
-                    this.error = 'Error: ' + error.message;
                     console.error('Fetch error:', error);
+                    this.error = `Error: ${error.message}`;
                 } finally {
                     this.loading = false;
                 }
@@ -62,12 +338,10 @@
                             quantity: 1
                         })
                     });
-
                     if (!response.ok) {
                         const errorData = await response.json();
                         throw new Error(errorData.detail || 'Failed to add to cart');
                     }
-                    
                     this.cartCount++;
                     this.message = 'Added to cart successfully!';
                     setTimeout(() => this.message = null, 3000);
@@ -89,7 +363,7 @@
                     setTimeout(() => this.message = null, 3000);
                 } catch (error) {
                     this.error = error.message;
-                    setTimeout(() => this.error = null, 3000);
+                    setTimeout(() => this.message = null, 3000);
                 }
             },
 
@@ -105,7 +379,7 @@
                     setTimeout(() => this.message = null, 3000);
                 } catch (error) {
                     this.error = error.message;
-                    setTimeout(() => this.error = null, 3000);
+                    setTimeout(() => this.message = null, 3000);
                 }
             },
 
@@ -117,22 +391,46 @@
             },
 
             getImageUrl(product) {
-                if (product.image_url) {
-                    return product.image_url;
+                if (!product?.image_url) {
+                    console.warn('No image URL for:', product?.name);
+                    return '/spa/assets/default-product-image.png';
                 }
-                return 'https://semantic-ui.com/images/wireframe/image.png';
+                try {
+                    const url = new URL(product.image_url);
+                    return `${this.baseUrl}/media/products/${url.pathname.split('/').pop()}`;
+                } catch (e) {
+                    console.error('Invalid image URL:', product.image_url);
+                    return '/spa/assets/default-product-image.png';
+                }
             }
-         }"
-         x-init="fetchProducts">
+         }" x-init="fetchProducts">
 
-        <!-- Edit Mode Toggle -->
-        <div class="edit-controls">
-            <button class="ui button" 
-                    x-bind:class="editMode ? 'negative' : 'positive'"
-                    @click="editMode = !editMode">
-                <i class="edit icon"></i>
-                <span x-text="editMode ? 'Exit Edit Mode' : 'Enter Edit Mode'"></span>
-            </button>
+        <!-- Navigation Bar -->
+        <div class="navbar">
+            <div class="ui container">
+                <h2 class="ui header">
+                    <i class="shopping bag icon"></i>
+                    <div class="content">Product Store</div>
+                </h2>
+                <button class="ui button"
+                        x-bind:class="editMode ? 'negative' : 'positive'"
+                        @click="editMode = !editMode">
+                    <i class="edit icon"></i>
+                    <span x-text="editMode ? 'Exit Edit Mode' : 'Enter Edit Mode'"></span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Messages -->
+        <div class="messages">
+            <div class="ui negative message" x-show="error" x-cloak>
+                <i class="close icon" @click="error = null"></i>
+                <div class="content" x-text="error"></div>
+            </div>
+            <div class="ui positive message" x-show="message" x-cloak>
+                <i class="close icon" @click="message = null"></i>
+                <div class="content" x-text="message"></div>
+            </div>
         </div>
 
         <!-- Cart Badge -->
@@ -141,60 +439,52 @@
             <span x-text="cartCount"></span>
         </div>
 
-        <!-- Messages -->
-        <div class="ui negative message" x-show="error" x-cloak>
-            <i class="close icon" @click="error = null"></i>
-            <div class="content" x-text="error"></div>
-        </div>
-
-        <div class="ui positive message" x-show="message" x-cloak>
-            <i class="close icon" @click="message = null"></i>
-            <div class="content" x-text="message"></div>
-        </div>
-
         <!-- Loading State -->
         <div class="ui active dimmer" x-show="loading" x-cloak>
             <div class="ui loader"></div>
         </div>
 
         <!-- Products Grid -->
-        <div class="ui three stackable cards">
+        <div class="ui three stackable cards product-grid">
             <template x-for="product in products" :key="product.id">
-                <div class="ui card">
-                    <div class="image">
-                        <img :src="getImageUrl(product)" 
+                <div class="ui card product-card"
+                     x-data="{ hasError: false }"
+                     x-effect="hasError = false">
+                    <div class="image-container" x-show="!hasError">
+                        <img :src="getImageUrl(product)"
                              :alt="product.name"
-                             class="product-image">
+                             class="product-image"
+                             loading="lazy"
+                             @error="hasError = true">
+                    </div>
+                    <div class="image-container" x-show="hasError">
+                        <div class="ui placeholder">
+                            <div class="square image"></div>
+                        </div>
                     </div>
                     <div class="content">
-                        <div class="header" x-text="product.name"></div>
-                        <div class="meta" x-show="!editMode">
-                            <span x-text="'Stock: ' + product.stock"></span>
+                        <div class="product-header" x-text="product.name"></div>
+                        <div class="meta">
+                            <span class="price-tag" x-text="formatPrice(product.price)"></span>
+                            <span class="stock-badge" x-text="product.stock + ' in stock'"></span>
                         </div>
-                        <div class="meta" x-show="editMode">
-                            <div class="ui mini form">
-                                <div class="field">
-                                    <label>Update Stock:</label>
+                        <div class="description" x-text="product.description"></div>
+                        <!-- Edit Mode Controls -->
+                        <div x-show="editMode" class="ui form" style="margin-top: 1.5rem;">
+                            <div class="field">
+                                <label>Update Stock</label>
+                                <div class="ui right labeled input">
                                     <input type="number" x-model="product.stock" min="0">
-                                    <button class="ui tiny primary button"
-                                            @click="updateStock(product)"
-                                            style="margin-top: 5px;">
-                                        Save Changes
+                                    <button class="ui tag label"
+                                            @click="updateStock(product)">
+                                        Update
                                     </button>
                                 </div>
                             </div>
                         </div>
-                        <div class="description" x-text="product.description"></div>
                     </div>
                     <div class="extra content">
-                        <span class="right floated" x-text="formatPrice(product.price)"></span>
-                        <span>
-                            <i class="box icon"></i>
-                            <span x-text="product.stock + ' in stock'"></span>
-                        </span>
-                    </div>
-                    <div class="extra content">
-                        <button class="ui primary fluid button" 
+                        <button class="ui primary fluid button add-to-cart-btn"
                                 x-show="!editMode"
                                 @click="addToCart(product.id)"
                                 x-bind:class="{ 'disabled': product.stock === 0 }">

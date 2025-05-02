@@ -4,8 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Add Product</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.css">
-    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    
+    <!-- Preload critical resources -->
+    <link rel="preload" href="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/themes/default/assets/fonts/icons.woff2" as="font" crossorigin>
+    <link rel="preload" href="https://fonts.gstatic.com/s/lato/v24/S6uyw4BMUTPHjx4wXg.woff2" as="font" crossorigin>
+    
+    <!-- Semantic UI with local fallback -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.css" 
+          onerror="this.onerror=null;this.href='/spa/assets/semantic.min.css';">
+    
+    <!-- Alpine.js with version lock and local fallback -->
+    <script defer src="https://unpkg.com/alpinejs@3.14.8/dist/cdn.min.js"
+            onerror="this.onerror=null;this.src='/spa/assets/alpine.min.js';"></script>
+
     <style>
         .preview-image {
             max-width: 200px;
@@ -17,12 +28,24 @@
             font-size: 0.9em;
             margin-top: 5px;
         }
+        
+        /* Font fallbacks */
+        @font-face {
+            font-family: 'Lato';
+            font-display: swap;
+            src: local('Lato Regular'), local('Lato-Regular'),
+                 url('https://fonts.gstatic.com/s/lato/v24/S6uyw4BMUTPHjx4wXg.woff2') format('woff2');
+        }
+        
+        body {
+            font-family: 'Lato', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        }
     </style>
 </head>
 <body>
     <div class="ui container" style="padding: 2rem;">
         <div x-data="{
-            baseUrl: 'http://172.17.100.14:3329/default',
+            baseUrl: 'http://172.17.100.14:3383/default',
             product: {
                 name: '',
                 description: '',
@@ -46,19 +69,41 @@
             handleImageUpload(event) {
                 const file = event.target.files[0];
                 if (file) {
+                    // Validate file size (5MB limit)
                     if (file.size > 5 * 1024 * 1024) {
                         this.errors.image = 'Image size should be less than 5MB';
                         event.target.value = '';
                         return;
                     }
+                    
+                    // Validate file type
                     if (!['image/jpeg', 'image/png'].includes(file.type)) {
                         this.errors.image = 'Only JPG and PNG images are allowed';
                         event.target.value = '';
                         return;
                     }
-                    this.product.image = file;
+            
+                    // Generate a clean filename with timestamp
+                    const timestamp = new Date().getTime();
+                    const fileExt = file.name.split('.').pop().toLowerCase();
+                    const fileName = `product_${timestamp}.${fileExt}`;
+            
+                    // Create new File object with clean name
+                    this.product.image = new File([file], fileName, {
+                        type: file.type,
+                        lastModified: file.lastModified,
+                    });
+            
+                    // Create preview
                     this.imagePreview = URL.createObjectURL(file);
                     this.errors.image = '';
+                    
+                    console.log('Image prepared:', {
+                        originalName: file.name,
+                        newName: fileName,
+                        type: file.type,
+                        size: file.size
+                    });
                 }
             },
             async addProduct() {
@@ -71,8 +116,14 @@
                     formData.append('description', this.product.description);
                     formData.append('price', this.product.price);
                     formData.append('stock', this.product.stock);
+                    
                     if (this.product.image) {
                         formData.append('image', this.product.image);
+                        console.log('Uploading image:', {
+                            name: this.product.image.name,
+                            type: this.product.image.type,
+                            size: this.product.image.size
+                        });
                     }
 
                     const response = await fetch(`${this.baseUrl}/api/products/`, {
@@ -81,21 +132,27 @@
                     });
                     
                     const data = await response.json();
+                    console.log('Server response:', data);
                     
-                    if (response.ok) {
-                        this.message = 'Product added successfully!';
-                        this.clearForm();
-                    } else {
-                        this.message = data.error || 'Failed to add product';
-                        if (data.errors) {
-                            this.errors = data.errors;
-                        }
+                    if (!response.ok) {
+                        throw new Error(data.detail || data.error || 'Failed to add product');
                     }
+
+                    // Log the created product details
+                    console.log('Created product:', {
+                        id: data.id,
+                        name: data.name,
+                        image: data.image
+                    });
+                    
+                    this.message = 'Product added successfully!';
+                    this.clearForm();
                 } catch (error) {
                     console.error('Error:', error);
                     this.message = 'Error: ' + error.message;
+                } finally {
+                    this.loading = false;
                 }
-                this.loading = false;
             },
             clearForm() {
                 this.product = {
@@ -107,6 +164,12 @@
                 };
                 this.imagePreview = null;
                 this.errors = {};
+                document.getElementById('imageInput').value = '';
+            },
+            clearImage() {
+                this.product.image = null;
+                this.imagePreview = null;
+                this.errors.image = '';
                 document.getElementById('imageInput').value = '';
             }
         }">
@@ -150,12 +213,32 @@
                         <!-- Image Upload -->
                         <div class="field" x-bind:class="{ 'error': errors.image }">
                             <label>Product Image</label>
-                            <input type="file" 
-                                   id="imageInput"
-                                   accept="image/jpeg,image/png"
-                                   @change="handleImageUpload">
+                            <div class="ui action input">
+                                <input type="file" 
+                                       id="imageInput"
+                                       accept="image/jpeg,image/png"
+                                       @change="handleImageUpload"
+                                       style="display: none">
+                                <label for="imageInput" class="ui icon button">
+                                    <i class="upload icon"></i>
+                                    Choose Image
+                                </label>
+                                <div class="ui basic label" x-text="product.image ? product.image.name : 'No file chosen'"></div>
+                            </div>
                             <div class="error-text" x-show="errors.image" x-text="errors.image"></div>
-                            <img x-show="imagePreview" :src="imagePreview" class="preview-image">
+                            
+                            <!-- Image Preview -->
+                            <div x-show="imagePreview" class="ui segment" style="margin-top: 1rem; position: relative;">
+                                <img :src="imagePreview" 
+                                     class="preview-image"
+                                     style="max-width: 200px; max-height: 200px; object-fit: contain;">
+                                <button type="button"
+                                        class="ui red mini icon button"
+                                        @click.prevent="clearImage"
+                                        style="position: absolute; top: 0.5rem; right: 0.5rem;">
+                                    <i class="times icon"></i>
+                                </button>
+                            </div>
                         </div>
 
                         <!-- Submit Button -->
