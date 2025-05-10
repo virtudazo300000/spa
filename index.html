@@ -6,7 +6,11 @@
     <title>Chat Application</title>
     
     <!-- Include Alpine.js -->
+<<<<<<< HEAD
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
+=======
+    <script defer src="config/localjs/alpine.min.js"></script>
+>>>>>>> 97bb422... first commit
     
     <!-- Link to Local Semantic UI CSS -->
     <link rel="stylesheet" href="config/localui/semantic.min.css">
@@ -46,6 +50,7 @@
                 <a class="item" href="#" @click.prevent="navigateTo('chat/chat_list'); open = false;">Chat List</a>
             </div>
         </div>
+<<<<<<< HEAD
         <div class="ui dropdown item" x-data="{ open: false }" @click="open = !open">
             Product <i class="dropdown icon"></i>
             <div class="menu" x-show="open" @click.outside="open = false">
@@ -57,6 +62,8 @@
                 
             </div>
         </div>
+=======
+>>>>>>> 97bb422... first commit
         
         <a class="item" @click.prevent="navigateTo('services/service')">Services</a>
         
@@ -83,4 +90,8 @@
         }
     </script>
 </body>
+<<<<<<< HEAD
 </html>
+=======
+</html>
+>>>>>>> 97bb422... first commit
